@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14151a">
+<title>Çiş Takibi</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root{
+    --bg:#14151a; --surface:#22242c; --surface2:#2b2e38; --text:#eceef3; --muted:#8a8f9e;
+    --red:#c8283a; --blue:#1d6fd1; --purple:#8a35b0; --empty:#292b35;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  button{font:inherit;color:inherit;border:0;cursor:pointer}
+  .view{display:none;min-height:100%;padding:14px;max-width:640px;margin:0 auto}
+  .view.active{display:block}
+
+  /* giriş */
+  #giris{text-align:center;padding-top:14vh}
+  #giris h1{font-size:28px;margin:0 0 6px}
+  #giris p{color:var(--muted);margin:0 0 32px}
+  .rol{display:block;width:100%;padding:26px 0;margin-bottom:14px;border-radius:14px;font-size:20px;font-weight:700}
+  .rol.kirmizi{background:var(--red)} .rol.mavi{background:var(--blue)}
+
+  /* ana ekran */
+  header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+  header h1{font-size:20px;margin:0}
+  #durum{font-size:12px;color:var(--muted)}
+  #durum.hata{color:#ff8a8a}
+  #isaretle{width:100%;padding:20px 0;border-radius:14px;font-size:18px;font-weight:700;margin-bottom:6px;
+    transition:transform .08s}
+  #isaretle:active{transform:scale(.98)}
+  #isaretle small{display:block;font-weight:500;opacity:.85;font-size:13px;margin-top:2px}
+  #ozet{color:var(--muted);font-size:13px;margin:10px 2px 14px}
+  #saatler{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .saat{position:relative;overflow:hidden;background:var(--surface);border-radius:12px;padding:14px 12px 16px;text-align:left}
+  .saat b{font-size:17px;display:block;font-variant-numeric:tabular-nums}
+  .saat span{font-size:13px;color:var(--muted)}
+  .saat i{position:absolute;left:0;bottom:0;height:4px;background:var(--purple);width:0}
+  .saat.simdi{outline:2px solid var(--muted)}
+  .saat.dolu i{background:#3fbf7f}
+  footer{margin:22px 0 10px;text-align:center}
+  footer button{background:none;color:var(--muted);font-size:13px;text-decoration:underline}
+
+  /* detay */
+  .ust{display:flex;align-items:center;gap:12px;margin-bottom:12px;position:sticky;top:0;background:var(--bg);padding:6px 0;z-index:2}
+  .geri{background:var(--surface2);padding:10px 16px;border-radius:10px;font-weight:700}
+  .ust h2{margin:0;font-size:18px}
+  #dakikalar{display:grid;gap:5px}
+  .dk{display:flex;justify-content:space-between;align-items:center;background:var(--empty);
+    border-radius:8px;padding:0 12px;height:45px;font-variant-numeric:tabular-nums}
+  .dk b{font-size:15px}
+  .dk span{font-size:13px;color:var(--muted)}
+  .dk.k{background:var(--red)} .dk.m{background:var(--blue)} .dk.km{background:var(--purple)}
+  .dk.k span,.dk.m span,.dk.km span{color:rgba(255,255,255,.9)}
+  .dk.simdi{outline:2px solid #fff}
+
+  /* toast + tombala */
+  #toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translate(-50%,20px);
+    background:#f2f3f7;color:#14151a;padding:12px 20px;border-radius:12px;font-weight:600;font-size:14px;
+    opacity:0;pointer-events:none;transition:.2s;max-width:90%;text-align:center;z-index:10}
+  #toast.goster{opacity:1;transform:translate(-50%,0)}
+  #tombala{position:fixed;inset:0;background:rgba(10,10,14,.92);display:none;align-items:center;justify-content:center;
+    flex-direction:column;text-align:center;padding:30px;z-index:20}
+  #tombala.goster{display:flex}
+  #tombala h1{font-size:44px;margin:0 0 10px}
+  #tombala p{color:var(--muted);margin:0 0 26px;font-size:17px}
+  #tombala button{background:var(--purple);padding:14px 36px;border-radius:12px;font-weight:700;font-size:16px}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<section id="giris" class="view">
+  <h1>Çiş Takibi</h1>
+  <p>Kim olarak giriş yapıyorsunuz?</p>
+  <button class="rol kirmizi" data-rol="kirmizi">Boran (Kırmızı)</button>
+  <button class="rol mavi" data-rol="mavi">Burak (Mavi)</button>
+</section>
+
+<section id="ana" class="view">
+  <header><h1>Çiş Takibi</h1><div id="durum">bağlanıyor…</div></header>
+  <button id="isaretle">Şu Anki Dakikayı İşaretle</button>
+  <div id="ozet"></div>
+  <div id="saatler"></div>
+  <footer><button id="kullaniciDegis">Kullanıcıyı değiştir</button></footer>
+</section>
+
+<section id="detay" class="view">
+  <div class="ust"><button class="geri" id="geri">← Geri</button><h2 id="detayBaslik"></h2></div>
+  <div id="dakikalar"></div>
+</section>
+
+<div id="toast"></div>
+<div id="tombala">
+  <h1>🎉 TOMBALA! 🎉</h1>
+  <p>Tüm günün 1440 dakikası da doldu!</p>
+  <button id="tombalaKapat">Harika</button>
+</div>
+
+<script>
+const FIREBASE_URL = "https://ciss-efe78-default-rtdb.europe-west1.firebasedatabase.app/dakikalar";
+const ADLAR = { kirmizi: "Boran", mavi: "Burak" };
+
+const $ = s => document.querySelector(s);
+const pad = n => String(n).padStart(2, "0");
+const keyOf = (h, m) => `${pad(h)}_${pad(m)}`;
+
+let kullanici = null;
+let veri = {};
+let acikSaat = null;
+let pollTimer = null;
+
+function depoOku(k){ try{ return localStorage.getItem(k) }catch(e){ return null } }
+function depoYaz(k,v){ try{ localStorage.setItem(k,v) }catch(e){} }
+
+/* ---------- ağ ---------- */
+async function istek(url, opts = {}) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 7000);
+  try {
+    const r = await fetch(url, { ...opts, signal: ctl.signal, cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+
+async function yenile() {
+  try {
+    veri = (await istek(`${FIREBASE_URL}.json`)) || {};
+    $("#durum").textContent = "canlı • " + new Date().toLocaleTimeString("tr-TR", {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    $("#durum").className = "";
+    ciz();
+  } catch (e) {
+    $("#durum").textContent = "bağlantı yok";
+    $("#durum").className = "hata";
+  }
+}
+
+/* ---------- işaretleme ---------- */
+async function isaretle() {
+  const d = new Date();
+  const h = d.getHours(), m = d.getMinutes();
+  const etiket = `${pad(h)}:${pad(m)}`;
+  const key = keyOf(h, m);
+  const btn = $("#isaretle");
+  btn.disabled = true;
+  try {
+    const mevcut = (await istek(`${FIREBASE_URL}/${key}.json`)) || {};
+    if (mevcut[kullanici]) { toast(`Zaten ${etiket} dakikasını işaretlediniz!`); return; }
+    // PATCH: sadece kendi alanını yazar, diğer kişinin işaretini ezmez
+    await istek(`${FIREBASE_URL}/${key}.json`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [kullanici]: true })
+    });
+    if (navigator.vibrate) navigator.vibrate(40);
+    toast(`✓ ${etiket} dakikası işaretlendi!`);
+    await yenile();
+  } catch (e) {
+    toast("Kaydedilemedi, bağlantıyı kontrol edin");
+  } finally { btn.disabled = false; }
+}
+
+/* ---------- çizim ---------- */
+function dakikaDurumu(h, m) {
+  const o = veri[keyOf(h, m)] || {};
+  return { k: !!o.kirmizi, m: !!o.mavi };
+}
+
+function ciz() {
+  const simdi = new Date().getHours();
+  let toplam = 0;
+  for (let h = 0; h < 24; h++) {
+    let n = 0;
+    for (let m = 0; m < 60; m++) { const s = dakikaDurumu(h, m); if (s.k || s.m) n++; }
+    toplam += n;
+    const el = $(`#saat-${h}`);
+    el.querySelector("span").textContent = `${n}/60 dolu`;
+    el.querySelector("i").style.width = (n / 60 * 100) + "%";
+    el.classList.toggle("dolu", n === 60);
+    el.classList.toggle("simdi", h === simdi);
+  }
+  $("#ozet").textContent = `Bugün toplam ${toplam} / 1440 dakika`;
+  if (acikSaat !== null) cizDetay();
+  if (toplam >= 1440) tombala();
+}
+
+function cizDetay() {
+  const d = new Date();
+  for (let m = 0; m < 60; m++) {
+    const s = dakikaDurumu(acikSaat, m);
+    const el = $(`#dk-${m}`);
+    el.className = "dk" + (s.k && s.m ? " km" : s.k ? " k" : s.m ? " m" : "")
+      + (d.getHours() === acikSaat && d.getMinutes() === m ? " simdi" : "");
+    el.querySelector("span").textContent =
+      s.k && s.m ? "✓ Boran & Burak (İkiniz)" : s.k ? "● Boran (Kırmızı)" : s.m ? "● Burak (Mavi)" : "Boş";
+  }
+}
+
+function tombala() {
+  const bugun = new Date().toDateString();
+  if (depoOku("tombala") === bugun) return;
+  depoYaz("tombala", bugun);
+  $("#tombala").classList.add("goster");
+}
+
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg; t.classList.add("goster");
+  clearTimeout(toast.z); toast.z = setTimeout(() => t.classList.remove("goster"), 2500);
+}
+
+/* ---------- ekranlar ---------- */
+function goster(id) {
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === id));
+  window.scrollTo(0, 0);
+}
+
+function saatAc(h) {
+  acikSaat = h;
+  $("#detayBaslik").textContent = `Saat ${pad(h)}:00 Dilimi`;
+  for (let m = 0; m < 60; m++) $(`#dk-${m} b`).textContent = `${pad(h)}:${pad(m)}`;
+  cizDetay();
+  goster("detay");
+  history.pushState({ detay: h }, "");
+  if (new Date().getHours() === h) {
+    const m = new Date().getMinutes();
+    setTimeout(() => $(`#dk-${m}`).scrollIntoView({ block: "center" }), 30);
+  }
+}
+
+function anaGoster() { acikSaat = null; goster("ana"); }
+
+function baslat() {
+  $("#isaretle").style.background = kullanici === "kirmizi" ? "var(--red)" : "var(--blue)";
+  $("#isaretle").innerHTML = `Şu Anki Dakikayı İşaretle<small>${ADLAR[kullanici]}</small>`;
+  anaGoster();
+  yenile();
+  clearInterval(pollTimer);
+  pollTimer = setInterval(() => { if (!document.hidden) yenile(); }, 3000);
+}
+
+/* ---------- kurulum ---------- */
+(function kur() {
+  // saat butonları
+  const sg = $("#saatler");
+  for (let h = 0; h < 24; h++) {
+    const b = document.createElement("button");
+    b.className = "saat"; b.id = `saat-${h}`;
+    b.innerHTML = `<b>Saat ${pad(h)}:00</b><span>0/60 dolu</span><i></i>`;
+    b.onclick = () => saatAc(h);
+    sg.appendChild(b);
+  }
+  // dakika satırları
+  const dg = $("#dakikalar");
+  for (let m = 0; m < 60; m++) {
+    const r = document.createElement("div");
+    r.className = "dk"; r.id = `dk-${m}`;
+    r.innerHTML = `<b>00:00</b><span>Boş</span>`;
+    dg.appendChild(r);
+  }
+
+  document.querySelectorAll(".rol").forEach(b => b.onclick = () => {
+    kullanici = b.dataset.rol; depoYaz("kullanici", kullanici); baslat();
+  });
+  $("#isaretle").onclick = isaretle;
+  $("#geri").onclick = () => history.back();
+  $("#kullaniciDegis").onclick = () => {
+    if (confirm("Kullanıcı seçimi sıfırlansın mı?")) {
+      try{ localStorage.removeItem("kullanici") }catch(e){}
+      clearInterval(pollTimer); kullanici = null; goster("giris");
+    }
+  };
+  $("#tombalaKapat").onclick = () => $("#tombala").classList.remove("goster");
+  window.addEventListener("popstate", () => { if (acikSaat !== null) anaGoster(); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && kullanici) yenile(); });
+
+  kullanici = depoOku("kullanici");
+  if (kullanici === "kirmizi" || kullanici === "mavi") baslat(); else goster("giris");
+
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+})();
+</script>
+</body>
+</html>
