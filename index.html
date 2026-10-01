@@ -45,8 +45,6 @@
   .saat i{position:absolute;left:0;bottom:0;height:4px;background:var(--purple);width:0}
   .saat.simdi{outline:2px solid var(--muted)}
   .saat.dolu i{background:#3fbf7f}
-  footer{margin:22px 0 10px;text-align:center}
-  footer button{background:none;color:var(--muted);font-size:13px;text-decoration:underline}
 
   /* detay */
   .ust{display:flex;align-items:center;gap:12px;margin-bottom:12px;position:sticky;top:0;background:var(--bg);padding:6px 0;z-index:2}
@@ -89,7 +87,6 @@
   <button id="isaretle">Şu Anki Dakikayı İşaretle</button>
   <div id="ozet"></div>
   <div id="saatler"></div>
-  <footer><button id="kullaniciDegis">Kullanıcıyı değiştir</button></footer>
 </section>
 
 <section id="detay" class="view">
@@ -117,8 +114,11 @@ let veri = {};
 let acikSaat = null;
 let pollTimer = null;
 
-function depoOku(k){ try{ return localStorage.getItem(k) }catch(e){ return null } }
-function depoYaz(k,v){ try{ localStorage.setItem(k,v) }catch(e){} }
+function cerezOku(k){ const m = document.cookie.match(new RegExp("(?:^|; )" + k + "=([^;]*)")); return m ? decodeURIComponent(m[1]) : null }
+function cerezYaz(k,v){ document.cookie = `${k}=${encodeURIComponent(v)}; max-age=${60*60*24*3650}; path=/; SameSite=Lax` }
+function depoOku(k){ let v = null; try{ v = localStorage.getItem(k) }catch(e){} return v || cerezOku(k) }
+function depoYaz(k,v){ try{ localStorage.setItem(k,v) }catch(e){} cerezYaz(k,v) }
+function depoSil(k){ try{ localStorage.removeItem(k) }catch(e){} document.cookie = k + "=; max-age=0; path=/" }
 
 /* ---------- ağ ---------- */
 async function istek(url, opts = {}) {
@@ -268,20 +268,33 @@ function baslat() {
   }
 
   document.querySelectorAll(".rol").forEach(b => b.onclick = () => {
-    kullanici = b.dataset.rol; depoYaz("kullanici", kullanici); baslat();
+    const rol = b.dataset.rol;
+    if (!confirm(`${ADLAR[rol]} olarak kaydedilsin mi?\nBu seçim sadece bir kez yapılır.`)) return;
+    kullanici = rol; depoYaz("kullanici", rol);
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+    baslat();
   });
   $("#isaretle").onclick = isaretle;
   $("#geri").onclick = () => history.back();
-  $("#kullaniciDegis").onclick = () => {
-    if (confirm("Kullanıcı seçimi sıfırlansın mı?")) {
-      try{ localStorage.removeItem("kullanici") }catch(e){}
-      clearInterval(pollTimer); kullanici = null; goster("giris");
+  // Gizli sıfırlama (yanlış seçim için): ana ekran başlığına 7 kez hızlı dokun
+  let dokun = 0, dokunZ;
+  $("#ana h1").onclick = () => {
+    dokun++; clearTimeout(dokunZ); dokunZ = setTimeout(() => dokun = 0, 2000);
+    if (dokun >= 7) {
+      dokun = 0;
+      if (confirm("Kullanıcı kaydı silinsin mi?")) {
+        depoSil("kullanici"); clearInterval(pollTimer); kullanici = null; goster("giris");
+      }
     }
   };
   $("#tombalaKapat").onclick = () => $("#tombala").classList.remove("goster");
   window.addEventListener("popstate", () => { if (acikSaat !== null) anaGoster(); });
   document.addEventListener("visibilitychange", () => { if (!document.hidden && kullanici) yenile(); });
 
+  const p = new URLSearchParams(location.search).get("k");
+  if (!depoOku("kullanici") && (p === "boran" || p === "burak")) {
+    depoYaz("kullanici", p === "boran" ? "kirmizi" : "mavi");
+  }
   kullanici = depoOku("kullanici");
   if (kullanici === "kirmizi" || kullanici === "mavi") baslat(); else goster("giris");
 
