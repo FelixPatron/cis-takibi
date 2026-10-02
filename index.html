@@ -33,11 +33,10 @@
   header h1{font-size:20px;margin:0}
   #durum{font-size:12px;color:var(--muted)}
   #durum.hata{color:#ff8a8a}
-  #isaretle{width:100%;padding:20px 0;border-radius:14px;font-size:18px;font-weight:700;margin-bottom:6px;
+  #isaretle{width:100%;padding:20px 0;border-radius:14px;font-size:18px;font-weight:700;margin-bottom:14px;
     transition:transform .08s}
   #isaretle:active{transform:scale(.98)}
   #isaretle small{display:block;font-weight:500;opacity:.85;font-size:13px;margin-top:2px}
-  #ozet{color:var(--muted);font-size:13px;margin:10px 2px 14px}
   #saatler{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .saat{position:relative;overflow:hidden;background:var(--surface);border-radius:12px;padding:14px 12px 16px;text-align:left}
   .saat b{font-size:17px;display:block;font-variant-numeric:tabular-nums}
@@ -56,16 +55,6 @@
   #skorAlt{grid-column:1 / -1;display:flex;justify-content:space-between;background:var(--surface);
     border-radius:12px;padding:10px 14px;font-size:13px;color:var(--muted)}
   #skorAlt b{color:var(--text);font-variant-numeric:tabular-nums}
-
-  /* bildirim kartı */
-  details.bildirim{background:var(--surface);border-radius:12px;padding:12px 14px;margin:0 0 14px;font-size:14px}
-  details.bildirim summary{cursor:pointer;font-weight:600;list-style:none}
-  details.bildirim summary::-webkit-details-marker{display:none}
-  details.bildirim ol{margin:12px 0 0;padding-left:20px;color:var(--muted);line-height:1.5}
-  details.bildirim li{margin-bottom:10px}
-  details.bildirim a.btn,details.bildirim button{display:inline-block;margin-top:6px;background:var(--surface2);color:var(--text);
-    padding:9px 14px;border-radius:9px;font-size:13px;font-weight:600;text-decoration:none}
-  #topicKod{display:block;margin-top:6px;font-size:12px;word-break:break-all;color:var(--text);user-select:all}
 
   /* detay */
   .ust{display:flex;align-items:center;gap:12px;margin-bottom:12px;position:sticky;top:0;background:var(--bg);padding:6px 0;z-index:2}
@@ -101,6 +90,17 @@
   <p>Kim olarak giriş yapıyorsunuz?</p>
   <button class="rol kirmizi" data-rol="kirmizi">Boran (Kırmızı)</button>
   <button class="rol mavi" data-rol="mavi">Burak (Mavi)</button>
+</section>
+
+<section id="ana" class="view">
+  <header><h1>Çiş Takibi</h1><div id="durum">bağlanıyor…</div></header>
+  <div id="skor">
+    <div class="sk k" id="skK"><small>Boran</small><b>0</b></div>
+    <div class="sk m" id="skM"><small>Burak</small><b>0</b></div>
+    <div id="skorAlt"><span>Toplam: <b id="skT">0</b></span><span>İkisi birden: <b id="skO">0</b></span></div>
+  </div>
+  <button id="isaretle">Şu Anki Dakikayı İşaretle</button>
+  <div id="saatler"></div>
 </section>
 
 <section id="detay" class="view">
@@ -239,7 +239,6 @@ function ciz() {
   $("#skO").textContent = so;
   $("#skK").classList.toggle("onde", sk > sm);
   $("#skM").classList.toggle("onde", sm > sk);
-  $("#ozet").textContent = `Toplam ${toplam} / 1440 dakika`;
   if (acikSaat !== null) cizDetay();
   if (toplam >= 1440) tombala();
 }
@@ -293,9 +292,6 @@ function anaGoster() { acikSaat = null; goster("ana"); }
 function baslat() {
   $("#isaretle").style.background = kullanici === "kirmizi" ? "var(--red)" : "var(--blue)";
   $("#isaretle").innerHTML = `Şu Anki Dakikayı İşaretle<small>${ADLAR[kullanici]}</small>`;
-  const konu = KONU[kullanici];
-  $("#ntfyAbone").href = `ntfy://${NTFY.replace("https://","")}/${konu}`;
-  $("#topicKod").textContent = "Elle eklemek için konu: " + konu;
   anaGoster();
   yenile();
   clearInterval(pollTimer);
@@ -330,10 +326,6 @@ function baslat() {
     baslat();
   });
   $("#isaretle").onclick = isaretle;
-  $("#ntfyTest").onclick = async () => {
-    const ok = await bildir(kullanici, "✅ Test", "Bildirimler çalışıyor!", ["white_check_mark"]);
-    toast(ok ? "Test gönderildi, telefonu kontrol edin" : "Gönderilemedi, bağlantıyı kontrol edin");
-  };
   $("#geri").onclick = () => history.back();
   // Gizli sıfırlama (yanlış seçim için): ana ekran başlığına 7 kez hızlı dokun
   let dokun = 0, dokunZ;
