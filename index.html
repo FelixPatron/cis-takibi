@@ -46,6 +46,17 @@
   .saat.simdi{outline:2px solid var(--muted)}
   .saat.dolu i{background:#3fbf7f}
 
+  /* skor tablosu */
+  #skor{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+  .sk{border-radius:12px;padding:12px 14px;background:var(--surface);position:relative}
+  .sk small{display:block;font-size:12px;color:rgba(255,255,255,.8)}
+  .sk b{display:block;font-size:34px;line-height:1.1;font-variant-numeric:tabular-nums;margin-top:2px}
+  .sk.k{background:var(--red)} .sk.m{background:var(--blue)}
+  .sk.onde::after{content:"👑";position:absolute;right:12px;top:10px;font-size:18px}
+  #skorAlt{grid-column:1 / -1;display:flex;justify-content:space-between;background:var(--surface);
+    border-radius:12px;padding:10px 14px;font-size:13px;color:var(--muted)}
+  #skorAlt b{color:var(--text);font-variant-numeric:tabular-nums}
+
   /* bildirim kartı */
   details.bildirim{background:var(--surface);border-radius:12px;padding:12px 14px;margin:0 0 14px;font-size:14px}
   details.bildirim summary{cursor:pointer;font-weight:600;list-style:none}
@@ -90,25 +101,6 @@
   <p>Kim olarak giriş yapıyorsunuz?</p>
   <button class="rol kirmizi" data-rol="kirmizi">Boran (Kırmızı)</button>
   <button class="rol mavi" data-rol="mavi">Burak (Mavi)</button>
-</section>
-
-<section id="ana" class="view">
-  <header><h1>Çiş Takibi</h1><div id="durum">bağlanıyor…</div></header>
-  <button id="isaretle">Şu Anki Dakikayı İşaretle</button>
-  <div id="ozet"></div>
-  <details class="bildirim">
-    <summary>🔔 Bildirimler</summary>
-    <ol>
-      <li>Telefona ücretsiz <b>ntfy</b> uygulamasını kurun (bir kez).<br>
-        <a class="btn" href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" target="_blank" rel="noopener">Play Store'da aç</a></li>
-      <li>Bu butona basıp aboneliği onaylayın (bir kez).<br>
-        <a class="btn" id="ntfyAbone" href="#">Bildirimlere abone ol</a>
-        <span id="topicKod"></span></li>
-      <li>Çalıştığını deneyin.<br>
-        <button id="ntfyTest">Test bildirimi gönder</button></li>
-    </ol>
-  </details>
-  <div id="saatler"></div>
 </section>
 
 <section id="detay" class="view">
@@ -234,7 +226,20 @@ function ciz() {
     el.classList.toggle("simdi", h === simdi);
   }
   sonToplam = toplam;
-  $("#ozet").textContent = `Bugün toplam ${toplam} / 1440 dakika`;
+  let sk = 0, sm = 0, so = 0;
+  for (const key in veri) {
+    const o = veri[key] || {};
+    if (o.kirmizi) sk++;
+    if (o.mavi) sm++;
+    if (o.kirmizi && o.mavi) so++;
+  }
+  $("#skK b").textContent = sk;
+  $("#skM b").textContent = sm;
+  $("#skT").textContent = toplam;
+  $("#skO").textContent = so;
+  $("#skK").classList.toggle("onde", sk > sm);
+  $("#skM").classList.toggle("onde", sm > sk);
+  $("#ozet").textContent = `Toplam ${toplam} / 1440 dakika`;
   if (acikSaat !== null) cizDetay();
   if (toplam >= 1440) tombala();
 }
