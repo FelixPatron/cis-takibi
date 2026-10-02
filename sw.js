@@ -1,5 +1,5 @@
 // Önce ağ, olmazsa önbellek. Firebase istekleri asla önbelleğe alınmaz.
-const CACHE = "cis-takibi-v1";
+const CACHE = "cis-takibi-v2";
 const DOSYALAR = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
