@@ -82,6 +82,8 @@
   .il .satir{display:flex;justify-content:space-between;font-weight:600;font-size:14px;font-variant-numeric:tabular-nums}
   .il .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
   .il .chip{background:var(--surface2);border-radius:8px;padding:3px 8px;font-size:12px;font-variant-numeric:tabular-nums}
+  .ik span{display:block;font-size:10px;color:var(--muted);margin-top:2px}
+  .chip b{color:#ffd76a;margin-left:2px}
   .bosdurum{color:var(--muted);font-size:14px;text-align:center;padding:20px}
 
   /* detay */
@@ -247,15 +249,22 @@ async function isaretle() {
     // Önce güncel verinin tamamını al: çinko/tombala geçişini kesin tespit etmek için
     const once = (await istek(`${FIREBASE_URL}.json`)) || {};
     const mevcut = once[key] || {};
-    if (mevcut[kullanici]) { toast(`Zaten ${etiket} dakikasını işaretlediniz!`); return; }
-    // PATCH: sadece kendi alanını yazar, diğer kişinin işaretini ezmez
+    const bugun = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    // Bu dakika bu kişi için kaç kez işaretlenmiş (eski kayıtlarda sayaç yok = 1 kez)
+    const oncekiSayi = mevcut[kullanici + "_n"] || (mevcut[kullanici] ? 1 : 0);
+    // Aynı gün içinde aynı dakika tekrar işaretlenemez; ama başka bir günde işaretlenebilir
+    if (mevcut[kullanici] && mevcut[kullanici + "_son"] === bugun) {
+      toast(`Bugün zaten ${etiket} dakikasını işaretlediniz!`); return;
+    }
+    const yeniSayi = oncekiSayi + 1;
+    // PATCH: sadece kendi alanlarını yazar, diğer kişinin işaretini ezmez
     await istek(`${FIREBASE_URL}/${key}.json`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [kullanici]: true })
+      body: JSON.stringify({ [kullanici]: true, [kullanici + "_n"]: yeniSayi, [kullanici + "_son"]: bugun })
     });
     if (navigator.vibrate) navigator.vibrate(40);
-    toast(`✓ ${etiket} dakikası işaretlendi!`);
+    toast(yeniSayi > 1 ? `✓ ${etiket} işaretlendi (bu dakika için ${yeniSayi}. kez)` : `✓ ${etiket} dakikası işaretlendi!`);
 
     const sonra = JSON.parse(JSON.stringify(once));
     sonra[key] = { ...mevcut, [kullanici]: true };
@@ -270,10 +279,10 @@ async function isaretle() {
       ikisineBildir("🎊 2. ÇİNKO!", "Bütün saatler doldu! Şimdi tombala için ikiniz de her dakikayı doldurmalısınız.", ["tada"]);
     } else if (o.tamSaatler.length === 0 && n.tamSaatler.length > 0) {
       ikisineBildir("🎉 1. ÇİNKO!", `Saat ${pad(n.tamSaatler[0])}:00 tamamen doldu! (${ben} tamamladı)`, ["tada"]);
-    } else if (mevcut[diger]) {
+    } else if (mevcut[diger] && !mevcut[kullanici]) {
       bildir(diger, "💜 Aynı dakika!", `${ben} da ${etiket} dakikasını işaretledi`, ["purple_heart"]);
     } else {
-      bildir(diger, "💧 Yeni işaret", `${ben} ${etiket} dakikasını işaretledi`, ["droplet"]);
+      bildir(diger, "💧 Yeni işaret", `${ben} ${etiket} dakikasını işaretledi${yeniSayi > 1 ? " (" + yeniSayi + ". kez)" : ""}`, ["droplet"]);
     }
     await yenile();
   } catch (e) {
@@ -362,12 +371,18 @@ function cizIstatistik() {
   const kisi = acikKisi;
   if (!kisi) return;
   const renk = kisi === "kirmizi" ? "var(--red)" : "var(--blue)";
-  const saat = Array(24).fill(0);
-  const dakikalar = Array.from({ length: 24 }, () => []);
+  const saat = Array(24).fill(0);          // saat başına toplam işaretleme (tekrarlar dahil)
+  const dakikalar = Array.from({ length: 24 }, () => []);   // [dakika, kaç kez]
+  let farkliDakika = 0;
   for (let h = 0; h < 24; h++) {
     for (let m = 0; m < 60; m++) {
       const o = veri[keyOf(h, m)];
-      if (o && o[kisi]) { saat[h]++; dakikalar[h].push(m); }
+      if (o && o[kisi]) {
+        const sayi = o[kisi + "_n"] || 1;
+        saat[h] += sayi;
+        dakikalar[h].push([m, sayi]);
+        farkliDakika++;
+      }
     }
   }
   const topla = (a, b) => saat.slice(a, b).reduce((x, y) => x + y, 0);
@@ -378,7 +393,7 @@ function cizIstatistik() {
   $("#istBaslik").innerHTML = `<span style="color:${renk}">●</span> ${ADLAR[kisi]} • Sağlık Takibi`;
 
   $("#istKartlar").innerHTML = `
-    <div class="ik"><small>Toplam</small><b>${toplam} kez</b></div>
+    <div class="ik"><small>Toplam</small><b>${toplam} kez</b>${toplam !== farkliDakika ? `<span>${farkliDakika} farklı dakika</span>` : ""}</div>
     <div class="ik"><small>En yoğun saat</small><b>${toplam ? pad(saat.indexOf(max)) + ":00 (" + max + ")" : "—"}</b></div>
     <div class="ik"><small>Aktif saat</small><b>${aktif}/24</b></div>`;
 
@@ -400,7 +415,7 @@ function cizIstatistik() {
     if (!saat[h]) continue;
     satirlar.push(`<div class="il">
       <div class="satir"><span>${pad(h)}:00 – ${pad(h)}:59</span><span>${saat[h]} kez</span></div>
-      <div class="chips">${dakikalar[h].map(m => `<span class="chip">${pad(h)}:${pad(m)}</span>`).join("")}</div>
+      <div class="chips">${dakikalar[h].map(([m, n]) => `<span class="chip">${pad(h)}:${pad(m)}${n > 1 ? ` <b>×${n}</b>` : ""}</span>`).join("")}</div>
     </div>`);
   }
   $("#istListe").innerHTML = satirlar.join("") || '<div class="bosdurum">Henüz kayıt yok</div>';
