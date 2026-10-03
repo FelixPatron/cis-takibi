@@ -56,6 +56,34 @@
     border-radius:12px;padding:10px 14px;font-size:13px;color:var(--muted)}
   #skorAlt b{color:var(--text);font-variant-numeric:tabular-nums}
 
+  /* skor kutuları tıklanabilir */
+  button.sk{border:0;width:100%;text-align:left;color:#fff;font:inherit}
+  button.sk:active{filter:brightness(.92)}
+  .sk em{position:absolute;right:12px;bottom:10px;font-style:normal;font-size:12px;opacity:.85}
+
+  /* istatistik ekranı */
+  #istatistik h3{font-size:14px;color:var(--muted);font-weight:600;margin:22px 2px 10px}
+  #istKartlar{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .ik{background:var(--surface);border-radius:12px;padding:10px 12px}
+  .ik small{display:block;font-size:11px;color:var(--muted)}
+  .ik b{display:block;font-size:18px;margin-top:3px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  #istGrafik{display:flex;align-items:flex-end;gap:3px;background:var(--surface);border-radius:12px;padding:14px 10px 8px}
+  .col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;min-width:0}
+  .col .v{font-size:10px;margin-bottom:2px;font-variant-numeric:tabular-nums;min-height:12px}
+  .col .bar{width:100%;border-radius:4px 4px 0 0;background:var(--renk,#777)}
+  .col.bos .bar{opacity:.25}
+  .col .x{font-size:9px;color:var(--muted);margin-top:4px;height:11px}
+  #istParca{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .ip{background:var(--surface);border-radius:12px;padding:10px 6px;text-align:center}
+  .ip small{display:block;font-size:11px;color:var(--muted)}
+  .ip b{display:block;font-size:20px;margin:3px 0}
+  .ip span{font-size:11px;color:var(--muted)}
+  .il{background:var(--surface);border-radius:12px;padding:10px 14px;margin-bottom:8px}
+  .il .satir{display:flex;justify-content:space-between;font-weight:600;font-size:14px;font-variant-numeric:tabular-nums}
+  .il .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .il .chip{background:var(--surface2);border-radius:8px;padding:3px 8px;font-size:12px;font-variant-numeric:tabular-nums}
+  .bosdurum{color:var(--muted);font-size:14px;text-align:center;padding:20px}
+
   /* detay */
   .ust{display:flex;align-items:center;gap:12px;margin-bottom:12px;position:sticky;top:0;background:var(--bg);padding:6px 0;z-index:2}
   .geri{background:var(--surface2);padding:10px 16px;border-radius:10px;font-weight:700}
@@ -95,8 +123,8 @@
 <section id="ana" class="view">
   <header><h1>Çiş Takibi</h1><div id="durum">bağlanıyor…</div></header>
   <div id="skor">
-    <div class="sk k" id="skK"><small>Boran</small><b>0</b></div>
-    <div class="sk m" id="skM"><small>Burak</small><b>0</b></div>
+    <button class="sk k" id="skK" data-kisi="kirmizi"><small>Boran</small><b>0</b><em>Detay ›</em></button>
+    <button class="sk m" id="skM" data-kisi="mavi"><small>Burak</small><b>0</b><em>Detay ›</em></button>
     <div id="skorAlt"><span>Toplam: <b id="skT">0</b></span><span>İkisi birden: <b id="skO">0</b></span></div>
   </div>
   <button id="isaretle">Şu Anki Dakikayı İşaretle</button>
@@ -108,10 +136,21 @@
   <div id="dakikalar"></div>
 </section>
 
+<section id="istatistik" class="view">
+  <div class="ust"><button class="geri" id="geriIst">← Geri</button><h2 id="istBaslik"></h2></div>
+  <div id="istKartlar"></div>
+  <h3>Saatlere göre dağılım</h3>
+  <div id="istGrafik"></div>
+  <h3>Gün içi dağılım</h3>
+  <div id="istParca"></div>
+  <h3>Kayıtlar</h3>
+  <div id="istListe"></div>
+</section>
+
 <div id="toast"></div>
 <div id="tombala">
-  <h1>🎉 TOMBALA! 🎉</h1>
-  <p>Tüm günün 1440 dakikası da doldu!</p>
+  <h1 id="tombalaBaslik">🎉 TOMBALA! 🎉</h1>
+  <p id="tombalaMetin"></p>
   <button id="tombalaKapat">Harika</button>
 </div>
 
@@ -132,7 +171,7 @@ let kullanici = null;
 let veri = {};
 let acikSaat = null;
 let pollTimer = null;
-let sonToplam = 0;
+let acikKisi = null;
 
 function cerezOku(k){ const m = document.cookie.match(new RegExp("(?:^|; )" + k + "=([^;]*)")); return m ? decodeURIComponent(m[1]) : null }
 function cerezYaz(k,v){ document.cookie = `${k}=${encodeURIComponent(v)}; max-age=${60*60*24*3650}; path=/; SameSite=Lax` }
@@ -175,6 +214,27 @@ async function bildir(hedef, baslik, mesaj, etiketler) {
   } catch (e) { return false; }
 }
 
+/* ---------- çinko / tombala hesabı ---------- */
+function durumHesapla(v) {
+  let k = 0, m = 0;
+  const doluSaat = Array(24).fill(0);
+  for (let h = 0; h < 24; h++) {
+    for (let dk = 0; dk < 60; dk++) {
+      const o = v[keyOf(h, dk)] || {};
+      if (o.kirmizi) k++;
+      if (o.mavi) m++;
+      if (o.kirmizi || o.mavi) doluSaat[h]++;
+    }
+  }
+  const tamSaatler = [];
+  doluSaat.forEach((n, h) => { if (n === 60) tamSaatler.push(h); });
+  return {
+    tamSaatler,                          // tamamen dolan saatler (iki kişinin işareti birlikte)
+    hepsiDolu: tamSaatler.length === 24, // 2. çinko
+    tombala: k === 1440 && m === 1440    // ikisi de her dakikayı doldurdu
+  };
+}
+
 /* ---------- işaretleme ---------- */
 async function isaretle() {
   const d = new Date();
@@ -184,7 +244,9 @@ async function isaretle() {
   const btn = $("#isaretle");
   btn.disabled = true;
   try {
-    const mevcut = (await istek(`${FIREBASE_URL}/${key}.json`)) || {};
+    // Önce güncel verinin tamamını al: çinko/tombala geçişini kesin tespit etmek için
+    const once = (await istek(`${FIREBASE_URL}.json`)) || {};
+    const mevcut = once[key] || {};
     if (mevcut[kullanici]) { toast(`Zaten ${etiket} dakikasını işaretlediniz!`); return; }
     // PATCH: sadece kendi alanını yazar, diğer kişinin işaretini ezmez
     await istek(`${FIREBASE_URL}/${key}.json`, {
@@ -194,16 +256,34 @@ async function isaretle() {
     });
     if (navigator.vibrate) navigator.vibrate(40);
     toast(`✓ ${etiket} dakikası işaretlendi!`);
-    const onceki = sonToplam;
+
+    const sonra = JSON.parse(JSON.stringify(once));
+    sonra[key] = { ...mevcut, [kullanici]: true };
+    const o = durumHesapla(once), n = durumHesapla(sonra);
     const diger = DIGER[kullanici];
-    // bildirim gönder (uygulamayı bekletmesin diye await yok)
-    if (mevcut[diger]) bildir(diger, "💜 Aynı dakika!", `${ADLAR[kullanici]} da ${etiket} dakikasını işaretledi`, ["purple_heart"]);
-    else bildir(diger, "💧 Yeni işaret", `${ADLAR[kullanici]} ${etiket} dakikasını işaretledi`, ["droplet"]);
+    const ben = ADLAR[kullanici];
+
+    // Kutlama: her ikisine de bildirim. Yoksa normal bildirim sadece karşı tarafa.
+    if (!o.tombala && n.tombala) {
+      ikisineBildir("🏆 TOMBALA!", "İkiniz de günün 1440 dakikasının hepsini doldurdunuz!", ["trophy"]);
+    } else if (!o.hepsiDolu && n.hepsiDolu) {
+      ikisineBildir("🎊 2. ÇİNKO!", "Bütün saatler doldu! Şimdi tombala için ikiniz de her dakikayı doldurmalısınız.", ["tada"]);
+    } else if (o.tamSaatler.length === 0 && n.tamSaatler.length > 0) {
+      ikisineBildir("🎉 1. ÇİNKO!", `Saat ${pad(n.tamSaatler[0])}:00 tamamen doldu! (${ben} tamamladı)`, ["tada"]);
+    } else if (mevcut[diger]) {
+      bildir(diger, "💜 Aynı dakika!", `${ben} da ${etiket} dakikasını işaretledi`, ["purple_heart"]);
+    } else {
+      bildir(diger, "💧 Yeni işaret", `${ben} ${etiket} dakikasını işaretledi`, ["droplet"]);
+    }
     await yenile();
-    if (onceki < 1440 && sonToplam >= 1440) bildir(diger, "🎉 TOMBALA!", "Tüm günün 1440 dakikası doldu!", ["tada"]);
   } catch (e) {
     toast("Kaydedilemedi, bağlantıyı kontrol edin");
   } finally { btn.disabled = false; }
+}
+
+function ikisineBildir(baslik, mesaj, etiketler) {
+  bildir("kirmizi", baslik, mesaj, etiketler);
+  bildir("mavi", baslik, mesaj, etiketler);
 }
 
 /* ---------- çizim ---------- */
@@ -225,7 +305,6 @@ function ciz() {
     el.classList.toggle("dolu", n === 60);
     el.classList.toggle("simdi", h === simdi);
   }
-  sonToplam = toplam;
   let sk = 0, sm = 0, so = 0;
   for (const key in veri) {
     const o = veri[key] || {};
@@ -240,7 +319,8 @@ function ciz() {
   $("#skK").classList.toggle("onde", sk > sm);
   $("#skM").classList.toggle("onde", sm > sk);
   if (acikSaat !== null) cizDetay();
-  if (toplam >= 1440) tombala();
+  if (acikKisi !== null) cizIstatistik();
+  kutlamaKontrol(durumHesapla(veri));
 }
 
 function cizDetay() {
@@ -255,10 +335,19 @@ function cizDetay() {
   }
 }
 
-function tombala() {
-  const bugun = new Date().toDateString();
-  if (depoOku("tombala") === bugun) return;
-  depoYaz("tombala", bugun);
+// Ekranda kutlama: seviye 1 = 1. çinko, 2 = 2. çinko, 3 = tombala. Her seviye bu cihazda bir kez gösterilir.
+function kutlamaKontrol(d) {
+  const seviye = d.tombala ? 3 : d.hepsiDolu ? 2 : d.tamSaatler.length ? 1 : 0;
+  if (!seviye) return;
+  if (seviye <= Number(depoOku("kutlama_seviye") || 0)) return;
+  depoYaz("kutlama_seviye", String(seviye));
+  const metin = {
+    1: ["🎉 1. ÇİNKO! 🎉", `Saat ${pad(d.tamSaatler[0])}:00 tamamen doldu!`],
+    2: ["🎊 2. ÇİNKO! 🎊", "Bütün saatler doldu! Şimdi tombala için ikiniz de her dakikayı doldurmalısınız."],
+    3: ["🏆 TOMBALA! 🏆", "İkiniz de günün 1440 dakikasının hepsini doldurdunuz!"]
+  }[seviye];
+  $("#tombalaBaslik").textContent = metin[0];
+  $("#tombalaMetin").textContent = metin[1];
   $("#tombala").classList.add("goster");
 }
 
@@ -266,6 +355,62 @@ function toast(msg) {
   const t = $("#toast");
   t.textContent = msg; t.classList.add("goster");
   clearTimeout(toast.z); toast.z = setTimeout(() => t.classList.remove("goster"), 2500);
+}
+
+/* ---------- kişi istatistiği ---------- */
+function cizIstatistik() {
+  const kisi = acikKisi;
+  if (!kisi) return;
+  const renk = kisi === "kirmizi" ? "var(--red)" : "var(--blue)";
+  const saat = Array(24).fill(0);
+  const dakikalar = Array.from({ length: 24 }, () => []);
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m++) {
+      const o = veri[keyOf(h, m)];
+      if (o && o[kisi]) { saat[h]++; dakikalar[h].push(m); }
+    }
+  }
+  const topla = (a, b) => saat.slice(a, b).reduce((x, y) => x + y, 0);
+  const toplam = topla(0, 24);
+  const max = Math.max(...saat);
+  const aktif = saat.filter(n => n > 0).length;
+
+  $("#istBaslik").innerHTML = `<span style="color:${renk}">●</span> ${ADLAR[kisi]} • Sağlık Takibi`;
+
+  $("#istKartlar").innerHTML = `
+    <div class="ik"><small>Toplam</small><b>${toplam} kez</b></div>
+    <div class="ik"><small>En yoğun saat</small><b>${toplam ? pad(saat.indexOf(max)) + ":00 (" + max + ")" : "—"}</b></div>
+    <div class="ik"><small>Aktif saat</small><b>${aktif}/24</b></div>`;
+
+  const grafik = $("#istGrafik");
+  grafik.style.setProperty("--renk", renk);
+  grafik.innerHTML = saat.map((n, h) => `
+    <div class="col${n ? "" : " bos"}">
+      <div class="v">${n || ""}</div>
+      <div class="bar" style="height:${n ? Math.max(4, n / max * 100) : 2}px"></div>
+      <div class="x">${h % 3 === 0 ? pad(h) : ""}</div>
+    </div>`).join("");
+
+  const parcalar = [["Gece", "00–06", 0, 6], ["Sabah", "06–12", 6, 12], ["Öğlen", "12–18", 12, 18], ["Akşam", "18–24", 18, 24]];
+  $("#istParca").innerHTML = parcalar.map(([ad, aralik, a, b]) =>
+    `<div class="ip"><small>${ad}</small><b>${topla(a, b)}</b><span>${aralik}</span></div>`).join("");
+
+  const satirlar = [];
+  for (let h = 0; h < 24; h++) {
+    if (!saat[h]) continue;
+    satirlar.push(`<div class="il">
+      <div class="satir"><span>${pad(h)}:00 – ${pad(h)}:59</span><span>${saat[h]} kez</span></div>
+      <div class="chips">${dakikalar[h].map(m => `<span class="chip">${pad(h)}:${pad(m)}</span>`).join("")}</div>
+    </div>`);
+  }
+  $("#istListe").innerHTML = satirlar.join("") || '<div class="bosdurum">Henüz kayıt yok</div>';
+}
+
+function istatistikAc(kisi) {
+  acikKisi = kisi;
+  cizIstatistik();
+  goster("istatistik");
+  history.pushState({ ist: kisi }, "");
 }
 
 /* ---------- ekranlar ---------- */
@@ -287,7 +432,7 @@ function saatAc(h) {
   }
 }
 
-function anaGoster() { acikSaat = null; goster("ana"); }
+function anaGoster() { acikSaat = null; acikKisi = null; goster("ana"); }
 
 function baslat() {
   $("#isaretle").style.background = kullanici === "kirmizi" ? "var(--red)" : "var(--blue)";
@@ -327,6 +472,8 @@ function baslat() {
   });
   $("#isaretle").onclick = isaretle;
   $("#geri").onclick = () => history.back();
+  $("#geriIst").onclick = () => history.back();
+  document.querySelectorAll(".sk").forEach(b => b.onclick = () => istatistikAc(b.dataset.kisi));
   // Gizli sıfırlama (yanlış seçim için): ana ekran başlığına 7 kez hızlı dokun
   let dokun = 0, dokunZ;
   $("#ana h1").onclick = () => {
@@ -339,7 +486,7 @@ function baslat() {
     }
   };
   $("#tombalaKapat").onclick = () => $("#tombala").classList.remove("goster");
-  window.addEventListener("popstate", () => { if (acikSaat !== null) anaGoster(); });
+  window.addEventListener("popstate", () => { if (acikSaat !== null || acikKisi !== null) anaGoster(); });
   document.addEventListener("visibilitychange", () => { if (!document.hidden && kullanici) yenile(); });
 
   const p = new URLSearchParams(location.search).get("k");
