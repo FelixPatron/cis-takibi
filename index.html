@@ -174,6 +174,7 @@ let veri = {};
 let acikSaat = null;
 let pollTimer = null;
 let acikKisi = null;
+let sonIsaret = 0;
 
 function cerezOku(k){ const m = document.cookie.match(new RegExp("(?:^|; )" + k + "=([^;]*)")); return m ? decodeURIComponent(m[1]) : null }
 function cerezYaz(k,v){ document.cookie = `${k}=${encodeURIComponent(v)}; max-age=${60*60*24*3650}; path=/; SameSite=Lax` }
@@ -249,19 +250,17 @@ async function isaretle() {
     // Önce güncel verinin tamamını al: çinko/tombala geçişini kesin tespit etmek için
     const once = (await istek(`${FIREBASE_URL}.json`)) || {};
     const mevcut = once[key] || {};
-    const bugun = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     // Bu dakika bu kişi için kaç kez işaretlenmiş (eski kayıtlarda sayaç yok = 1 kez)
     const oncekiSayi = mevcut[kullanici + "_n"] || (mevcut[kullanici] ? 1 : 0);
-    // Aynı gün içinde aynı dakika tekrar işaretlenemez; ama başka bir günde işaretlenebilir
-    if (mevcut[kullanici] && mevcut[kullanici + "_son"] === bugun) {
-      toast(`Bugün zaten ${etiket} dakikasını işaretlediniz!`); return;
-    }
+    // Her işaretleme sayılır; sadece yanlışlıkla çift dokunmayı engellemek için 3 sn bekleme var
+    if (Date.now() - sonIsaret < 3000) { toast("Az önce işaretlediniz"); return; }
+    sonIsaret = Date.now();
     const yeniSayi = oncekiSayi + 1;
     // PATCH: sadece kendi alanlarını yazar, diğer kişinin işaretini ezmez
     await istek(`${FIREBASE_URL}/${key}.json`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [kullanici]: true, [kullanici + "_n"]: yeniSayi, [kullanici + "_son"]: bugun })
+      body: JSON.stringify({ [kullanici]: true, [kullanici + "_n"]: yeniSayi })
     });
     if (navigator.vibrate) navigator.vibrate(40);
     toast(yeniSayi > 1 ? `✓ ${etiket} işaretlendi (bu dakika için ${yeniSayi}. kez)` : `✓ ${etiket} dakikası işaretlendi!`);
@@ -415,7 +414,7 @@ function cizIstatistik() {
     if (!saat[h]) continue;
     satirlar.push(`<div class="il">
       <div class="satir"><span>${pad(h)}:00 – ${pad(h)}:59</span><span>${saat[h]} kez</span></div>
-      <div class="chips">${dakikalar[h].map(([m, n]) => `<span class="chip">${pad(h)}:${pad(m)}${n > 1 ? ` <b>×${n}</b>` : ""}</span>`).join("")}</div>
+      <div class="chips">${dakikalar[h].map(([m, n]) => `<span class="chip">${pad(h)}:${pad(m)}${n > 1 ? ` <b>· ${n} kez</b>` : ""}</span>`).join("")}</div>
     </div>`);
   }
   $("#istListe").innerHTML = satirlar.join("") || '<div class="bosdurum">Henüz kayıt yok</div>';
